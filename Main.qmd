@@ -1,0 +1,138 @@
+---
+title: "Main"
+format: html
+editor: visual
+---
+# Exercise one: 
+## Q1:
+Wicklin (2017) compares the 9 different definitions of sample quantiles. He explains that the methods can give different results, especially with small samples or large gaps between observations. For larger samples, above 100, the differences are usually small.  
+
+
+The type of order statistics I would use is type 8. This is because Hyndman and Fran (1996) looks at 9 types of computing order statistics and creates six desirable properties for a Sample Quantile. They recommend Type 8 because it gives approximately median unbiased estimates regardless of the underlying distribution. This makes Type 8 suitable for my case because my data is assumed to follow an exponential distribution.  
+
+Using help(quantile) to read the R documentation:  
+
+"# Default S3 method:  
+quantile(x, probs = seq(0, 1, 0.25), na.rm = FALSE,  
+         names = TRUE, type = 7, digits = 7,  
+         fuzz = if(type == 7L) 0 else 4 * .Machine$double.eps,  
+         ...)"  
+          
+and as stated in Wicklin (2017) "whereas R uses type=7 by default.", we can see that for R the default method for finding quantiles is type 7.
+
+```{r, echo = FALSE, results='hide', message=FALSE, warning=FALSE}
+#help(quantile)
+```
+
+## Q2: 
+
+```{r}
+#Calculate the IQR estimate given x using type 8 to find quantile
+λ_IQR <- function(x) {
+  q <- quantile(x, probs = c(0.25, 0.75), type = 8)
+  return(log(3) / (q[2] - q[1]))
+}
+
+```
+
+
+
+```{r}
+λ_bootstrap <- function(x, reps = 200) {
+  λ_hat <- λ_IQR(x)
+  
+  bootstrap_estimates <- replicate(reps, {
+    x_star <- sample(x, size = length(x), replace = TRUE)
+    λ_IQR(x_star)
+  })
+  
+  bootstrap_bias <- mean(bootstrap_estimates) - λ_hat
+  
+  λ_tilde <- λ_hat - bootstrap_bias
+  
+  return(λ_tilde)
+}
+```
+
+
+## Q3:
+Do on computers as it is easier
+
+```{r}
+
+
+```
+
+# Exercise 2:
+## Q1:
+
+
+```{r, echo = FALSE, warning = FALSE, message = FALSE}
+library(fpp2)
+data(ausbeer)
+
+```
+
+From the frequency method below we can see there is an output of 4. This means that there is 4 observations per year. Each 
+
+The frequency of the series is quarterly, with four observations per year. This can be determined from the frequency() function which returns four. The output of four means that there is four observations per year which is every 3 months, i.e every quarter.
+
+```{r}
+frequency(ausbeer)
+```
+## Q2:
+We can see the overall behavior of the series from the plot below. There is evidence of a long term non linear trend. The trend starts with production increasing over the years, then in about 1975 the trend changes to a flat pattern where there is no noticeable trend in the production every year. Then in 1992 a small decrease in production through the years trend begins.
+
+
+```{r, echo = FALSE}
+plot(ausbeer, ylab = "Megalitres", main = "Figure 1: Ausbeer production throughout time")
+```
+## Q3:
+Yes there is evidence of seasonality, this can be seen in the plot below where regardless of where the year falls in the trend there are peaks in Q4 with Q1 being high as well. Q2 is the lowest with Q3 being slightly higher.
+
+
+```{r, echo = FALSE, warning = FALSE, message=FALSE}
+df <- as.data.frame(ausbeer)
+df$year <- floor(time(ausbeer))
+df$quarter <- cycle(ausbeer)
+
+ggplot(df, aes(x = quarter, y =x, group = year, 
+  color = factor(year))
+  ) + 
+  geom_line() + 
+  theme(legend.position = "none") +
+  labs(x = "Quarter", y = "Megalitres", title = "Figure 2: Beer production by quarter") +
+  theme_classic() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+## Q4:
+The variability is reasonably constant over time, this is because the difference between Q1, Q2, Q3, and Q4 appears reasonably constant. There is no clear increase or decrease in the size of the difference / variability. Therefore, a transformation is not necessary.
+
+## Q5:
+In figure 1 there is only one point that is unusual to me. That is the dip in 2004 Q4, the value 454. We expect a peak that matches the other Q4s surrounding but it is significantly than the others. This attracts attention as it is the lowest 4th quarter peak since 1972 and it is not due to the overall trend.
+
+## Q6:
+The seasonal plot (Figure 2) makes the strong quarterly pattern more obvious. The plot also makes it easier to compare the same quarters beer production across different years and identify years where production differs noticeably from the usual seasonal pattern. It is much harder to identify the long term trend from the seasonal plot as we cannot easily see how the Aus beer production changes over time. The original time series plot (Figure 1) is more useful to see the overally trend while the seasonal plot is more useful for identifying and comparing the beer production seasonal pattern between years in Australia.
+
+## Q7:
+The quarters expected values descending is Q4, Q1, Q3, and Q2. This is seen by the blue line which shows the mean for each quarter. The seasonal pattern is stable over time, each quarter follows the same trend and has peaks and dips in the same places.
+
+```{r, echo = FALSE}
+ggsubseriesplot(ausbeer) +
+  ylab("Megalitres") +
+  xlab("Quarter") +
+  ggtitle("Figure 3: Seasonal Subseries Plot of Australian Beer Production") +
+  theme_classic() +
+  theme(plot.title = element_text(hjust = 0.5))
+  
+```
+
+## Q8:
+
+I would detrend the series before modelling, as there is a long term trend in the time series plot, as seen in figure 1. I would not transform the series, as the variability appears to remain constant over time, as seen in figure 1 and 2. The seasonal pattern is also fairly consistent as seen in figure 2 & 3, with similar differences between the quarters throughout the series. Therefore, there is no strong visual evidence that a transformation is needed.
+
+
+# References:
+Hyndman and Fran (1986)
+https://www.amherst.edu/media/view/129116/original/Sample+Quantiles.pdf
