@@ -1,6 +1,6 @@
 ---
 title: "Main"
-format: html
+format: pdf
 editor: visual
 ---
 
@@ -10,7 +10,7 @@ editor: visual
 
 Wicklin (2017) compares the 9 different definitions of sample quantiles. He explains that the methods can give different results, especially with small samples or large gaps between observations. For larger samples, above 100, the differences are usually small.
 
-The type of order statistics I would use is type 8. This is because Hyndman and Fran (1996) looks at 9 types of computing order statistics and creates six desirable properties for a Sample Quantile. They recommend Type 8 because it gives approximately median unbiased estimates regardless of the underlying distribution. This makes Type 8 suitable for my case because my data is assumed to follow an exponential distribution.
+The type of order statistics I would use is type 8. This is because Hyndman and Fan (1996) looks at 9 types of computing order statistics and creates six desirable properties for a Sample Quantile. They recommend Type 8 because it gives approximately median unbiased estimates regardless of the underlying distribution. They recommend Type 8 because it gives approximately median unbiased estimates regardless of the underlying distribution.
 
 Using help(quantile) to read the R documentation:
 
@@ -76,7 +76,7 @@ Code is found below.
 set.seed(301)
 x <- rexp(100, rate = 1.0)
 
-λ_IQR(x)
+λ_iqr_estimate(x)
 set.seed(301) # found running the seed directly before returns the same results
 λ_bootstrap(x)
 ```
@@ -205,7 +205,7 @@ data(ausbeer)
 
 ```
 
-From the frequency method below we can see there is an output of 4. This means that there is 4 observations per year. Each
+From the frequency method below we can see there is an output of 4. This means that there is 4 observations per year. 
 
 The frequency of the series is quarterly, with four observations per year. This can be determined from the frequency() function which returns four. The output of four means that there is four observations per year which is every 3 months, i.e every quarter.
 
@@ -247,7 +247,7 @@ The variability is reasonably constant over time, this is because the difference
 
 ## Q5:
 
-In figure 1 there is only one point that is unusual to me. That is the dip in 2004 Q4, the value 454. We expect a peak that matches the other Q4s surrounding but it is significantly than the others. This attracts attention as it is the lowest 4th quarter peak since 1972 and it is not due to the overall trend.
+In figure 1 there is only one point that is unusual to me. That is the dip in 2004 Q4, the value 454. We expect a peak that matches the other Q4s surrounding but it is significantly lower than the others. This attracts attention as it is the lowest 4th quarter peak since 1972 and it is not due to the overall trend.
 
 ## Q6:
 
@@ -273,4 +273,4 @@ I would detrend the series before modelling, as there is a long term trend in th
 
 # References:
 
-Hyndman and Fran (1986) https://www.amherst.edu/media/view/129116/original/Sample+Quantiles.pdf
+Hyndman and Fan (1986) https://www.amherst.edu/media/view/129116/original/Sample+Quantiles.pdf
