@@ -3,69 +3,201 @@ title: "Main"
 format: html
 editor: visual
 ---
-# Exercise one: 
+
+# Exercise one:
+
 ## Q1:
-Wicklin (2017) compares the 9 different definitions of sample quantiles. He explains that the methods can give different results, especially with small samples or large gaps between observations. For larger samples, above 100, the differences are usually small.  
 
+Wicklin (2017) compares the 9 different definitions of sample quantiles. He explains that the methods can give different results, especially with small samples or large gaps between observations. For larger samples, above 100, the differences are usually small.
 
-The type of order statistics I would use is type 8. This is because Hyndman and Fran (1996) looks at 9 types of computing order statistics and creates six desirable properties for a Sample Quantile. They recommend Type 8 because it gives approximately median unbiased estimates regardless of the underlying distribution. This makes Type 8 suitable for my case because my data is assumed to follow an exponential distribution.  
+The type of order statistics I would use is type 8. This is because Hyndman and Fran (1996) looks at 9 types of computing order statistics and creates six desirable properties for a Sample Quantile. They recommend Type 8 because it gives approximately median unbiased estimates regardless of the underlying distribution. This makes Type 8 suitable for my case because my data is assumed to follow an exponential distribution.
 
-Using help(quantile) to read the R documentation:  
+Using help(quantile) to read the R documentation:
 
-"# Default S3 method:  
-quantile(x, probs = seq(0, 1, 0.25), na.rm = FALSE,  
-         names = TRUE, type = 7, digits = 7,  
-         fuzz = if(type == 7L) 0 else 4 * .Machine$double.eps,  
-         ...)"  
-          
+"\# Default S3 method:\
+quantile(x, probs = seq(0, 1, 0.25), na.rm = FALSE,\
+names = TRUE, type = 7, digits = 7,\
+fuzz = if(type == 7L) 0 else 4 \* .Machine\$double.eps,\
+...)"
+
 and as stated in Wicklin (2017) "whereas R uses type=7 by default.", we can see that for R the default method for finding quantiles is type 7.
 
 ```{r, echo = FALSE, results='hide', message=FALSE, warning=FALSE}
 #help(quantile)
+
 ```
 
-## Q2: 
-
+## Q2:
+Code is found below.
 ```{r}
-#Calculate the IQR estimate given x using type 8 to find quantile
-λ_IQR <- function(x) {
-  q <- quantile(x, probs = c(0.25, 0.75), type = 8)
-  return(log(3) / (q[2] - q[1]))
+#Calculate the estimate using IQR given x using type 8 to find quantile
+λ_iqr_estimate <- function(x) {
+  quantiles <- quantile(x, probs = c(0.25, 0.75), type = 8) #Unname removes the 75% on the putput which is confusing
+  return(log(3) / (quantiles[2] - quantiles[1]))
 }
 
 ```
-
-
 
 ```{r}
 λ_bootstrap <- function(x, reps = 200) {
-  λ_hat <- λ_IQR(x)
+  #Get the estimate for z
+  λ_hat <- λ_iqr_estimate(x)
   
-  bootstrap_estimates <- replicate(reps, {
-    x_star <- sample(x, size = length(x), replace = TRUE)
-    λ_IQR(x_star)
-  })
+  #Set up values
+  bootstrap_estimates <- numeric(reps)
+  failed <- 0
   
-  bootstrap_bias <- mean(bootstrap_estimates) - λ_hat
+  #Go through all the reps 
+  for (strap in 1:reps) {
+    #Sample x
+    x_sample <- sample(x, size = length(x), replace = TRUE)
+    
+    #Check if an inf will happen if so, skip this iteration and add to the count
+    quantiles <- quantile(x_sample, probs = c(0.25, 0.75), type = 8)
+    iqr <- quantiles[2] - quantiles[1]
+    
+    if (iqr == 0) {failed <- failed + 1}
+    
+    #Add the IQR estimate based of the sample of x
+    else {bootstrap_estimates[strap - failed] <- λ_iqr_estimate(x_sample)}
+  }
   
+  #Find the bias estimate and remove it from λ_hat to get a bias adjusted value
+  bootstrap_bias <- mean(bootstrap_estimates[1:(reps - failed)]) - λ_hat
   λ_tilde <- λ_hat - bootstrap_bias
   
-  return(λ_tilde)
+  return(list(estimate = λ_tilde, failed = failed))
 }
 ```
 
 
-## Q3:
-Do on computers as it is easier
 
 ```{r}
+set.seed(301)
+x <- rexp(100, rate = 1.0)
 
-
+λ_IQR(x)
+set.seed(301) # found running the seed directly before returns the same results
+λ_bootstrap(x)
 ```
 
-# Exercise 2:
-## Q1:
+## Q3:
+To decide on the number of Monte Carlo replications, I ran the experiment using 100, 500, 1,000, 3,000, and 5,000 replications. The MSE results for the maximum likelihood and IQR estimators become reasonably stable as the number of replications increases. The bootstrap estimator is also reasonably stable for n = 30 and n = 100, but there is much more variation when n = 5. This is because some of the bootstrap samples can have a very small IQR, which results in a very large estimate and therefore a large MSE.
 
+I will use 5,000 Monte Carlo replications for the final results. This gives enough replications to make the MSE results reasonably stable while also keeping the experiment at a reasonable computational time.
+
+For the final experiment, the MSE is calculated for each combination of lambda = 0.1, 1, 10 and n = 5, 30, 100. The results are shown below.
+
+
+Here is the code used below:
+
+```{r}
+#Values to iterate through
+λ_values <- c(0.1, 1, 10)
+n_values <- c(5, 30, 100)
+
+#Maximum likelihood estimator
+λ_maxi <- function(x) { return(1 / mean(x)) }
+```
+
+```{r} 
+run_monte_carlo <- function(monte_carlo_reps){
+  #Set up the results table
+results <- data.frame(
+  λ = numeric(),
+  n = integer(),
+  MSE_maxi = numeric(),
+  MSE_IQR = numeric(),
+  MSE_bootstrap = numeric(),
+  bootstrap_failed = numeric()
+)
+  
+  
+#Go through every value
+for (λ in λ_values) {
+  for (n in n_values) {
+    
+    #Store estimates from each Monte Carlo replication
+    maxi_estimates <- numeric(monte_carlo_reps)
+    iqr_estimates <- numeric(monte_carlo_reps)
+    bootstrap_estimates <- numeric(monte_carlo_reps)
+    bootstrap_failed <- numeric(monte_carlo_reps)
+    
+    for (rep in 1:monte_carlo_reps) {
+      
+      # Generate an exponential sample
+      x <- rexp(n, rate = λ)
+      
+      #Calculate the three estimators
+      maxi_estimates[rep] <- λ_maxi(x)
+      iqr_estimates[rep] <- λ_iqr_estimate(x)
+      
+      bootstrap_result <- λ_bootstrap(x)
+      bootstrap_estimates[rep] <- bootstrap_result$estimate
+      bootstrap_failed[rep] <- bootstrap_result$failed
+    }
+    
+    # Calculate MSE for each estimator
+    mse_maxi <- mean((maxi_estimates - λ)^2)
+    mse_iqr <- mean((iqr_estimates - λ)^2)
+    mse_bootstrap <- mean((bootstrap_estimates - λ)^2)
+    
+    #Add results to the results data frame
+    results <- rbind(
+      results,
+      data.frame(
+        λ = λ,
+        n = n,
+        MSE_maxi = mse_maxi,
+        MSE_IQR = mse_iqr,
+        MSE_bootstrap = mse_bootstrap,
+        bootstrap_failed = sum(bootstrap_failed)
+      )
+    )
+  }
+}
+return(results)
+}
+```
+
+Test run for 100 monte carlo reps:
+```{r}
+set.seed(301)
+results_100 <- run_monte_carlo(100)
+results_100
+```
+Test run for 500 monte carlo reps:
+```{r}
+set.seed(301)
+results_500 <- run_monte_carlo(500)
+results_500
+```
+Test run for 1000 monte carlo reps:
+```{r}
+set.seed(301)
+results_1000 <- run_monte_carlo(1000)
+results_1000
+```
+Test run for 3000 monte carlo reps:
+```{r}
+set.seed(301)
+results_3000 <- run_monte_carlo(3000)
+results_3000
+```
+Below is my final results table for 5000 Monte Carlo reps:
+The maximum likelihood estimator has the lowest MSE for all combinations of lambda and n. The IQR estimator has a higher MSE than the maximum likelihood estimator in every case. The bootstrap estimator generally has a higher MSE than both other estimators, particularly when n = 5. As the sample size increases, the MSE of all three estimators generally decreases.
+
+For n = 5, the bootstrap estimator has particularly large MSE values. This is most noticeable when lambda = 10, where the MSE is 6936.33. This is likely due to the small sample size making the IQR more sensitive to individual observations and causing some very large bootstrap estimates.
+```{r, echo=FALSE}
+set.seed(301)
+results_5000 <- run_monte_carlo(5000)
+results_5000
+```
+
+
+# Exercise 2:
+
+## Q1:
 
 ```{r, echo = FALSE, warning = FALSE, message = FALSE}
 library(fpp2)
@@ -73,23 +205,25 @@ data(ausbeer)
 
 ```
 
-From the frequency method below we can see there is an output of 4. This means that there is 4 observations per year. Each 
+From the frequency method below we can see there is an output of 4. This means that there is 4 observations per year. Each
 
 The frequency of the series is quarterly, with four observations per year. This can be determined from the frequency() function which returns four. The output of four means that there is four observations per year which is every 3 months, i.e every quarter.
 
 ```{r}
 frequency(ausbeer)
 ```
-## Q2:
-We can see the overall behavior of the series from the plot below. There is evidence of a long term non linear trend. The trend starts with production increasing over the years, then in about 1975 the trend changes to a flat pattern where there is no noticeable trend in the production every year. Then in 1992 a small decrease in production through the years trend begins.
 
+## Q2:
+
+We can see the overall behavior of the series from the plot below. There is evidence of a long term non linear trend. The trend starts with production increasing over the years, then in about 1975 the trend changes to a flat pattern where there is no noticeable trend in the production every year. Then in 1992 a small decrease in production through the years trend begins.
 
 ```{r, echo = FALSE}
 plot(ausbeer, ylab = "Megalitres", main = "Figure 1: Ausbeer production throughout time")
 ```
-## Q3:
-Yes there is evidence of seasonality, this can be seen in the plot below where regardless of where the year falls in the trend there are peaks in Q4 with Q1 being high as well. Q2 is the lowest with Q3 being slightly higher.
 
+## Q3:
+
+Yes there is evidence of seasonality, this can be seen in the plot below where regardless of where the year falls in the trend there are peaks in Q4 with Q1 being high as well. Q2 is the lowest with Q3 being slightly higher.
 
 ```{r, echo = FALSE, warning = FALSE, message=FALSE}
 df <- as.data.frame(ausbeer)
@@ -106,16 +240,21 @@ ggplot(df, aes(x = quarter, y =x, group = year,
   theme(plot.title = element_text(hjust = 0.5))
 
 ```
+
 ## Q4:
+
 The variability is reasonably constant over time, this is because the difference between Q1, Q2, Q3, and Q4 appears reasonably constant. There is no clear increase or decrease in the size of the difference / variability. Therefore, a transformation is not necessary.
 
 ## Q5:
+
 In figure 1 there is only one point that is unusual to me. That is the dip in 2004 Q4, the value 454. We expect a peak that matches the other Q4s surrounding but it is significantly than the others. This attracts attention as it is the lowest 4th quarter peak since 1972 and it is not due to the overall trend.
 
 ## Q6:
+
 The seasonal plot (Figure 2) makes the strong quarterly pattern more obvious. The plot also makes it easier to compare the same quarters beer production across different years and identify years where production differs noticeably from the usual seasonal pattern. It is much harder to identify the long term trend from the seasonal plot as we cannot easily see how the Aus beer production changes over time. The original time series plot (Figure 1) is more useful to see the overally trend while the seasonal plot is more useful for identifying and comparing the beer production seasonal pattern between years in Australia.
 
 ## Q7:
+
 The quarters expected values descending is Q4, Q1, Q3, and Q2. This is seen by the blue line which shows the mean for each quarter. The seasonal pattern is stable over time, each quarter follows the same trend and has peaks and dips in the same places.
 
 ```{r, echo = FALSE}
@@ -132,7 +271,6 @@ ggsubseriesplot(ausbeer) +
 
 I would detrend the series before modelling, as there is a long term trend in the time series plot, as seen in figure 1. I would not transform the series, as the variability appears to remain constant over time, as seen in figure 1 and 2. The seasonal pattern is also fairly consistent as seen in figure 2 & 3, with similar differences between the quarters throughout the series. Therefore, there is no strong visual evidence that a transformation is needed.
 
-
 # References:
-Hyndman and Fran (1986)
-https://www.amherst.edu/media/view/129116/original/Sample+Quantiles.pdf
+
+Hyndman and Fran (1986) https://www.amherst.edu/media/view/129116/original/Sample+Quantiles.pdf
